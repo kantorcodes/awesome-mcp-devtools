@@ -1,0 +1,48 @@
+name: Apply HOL Guard devtools catalog edit
+
+on:
+  push:
+    branches:
+      - add-hol-guard-security-testing
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out branch without third-party actions
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          BRANCH: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          git init .
+          git remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${REPO}.git"
+          git fetch --depth=1 origin "${BRANCH}"
+          git checkout -B "${BRANCH}" FETCH_HEAD
+
+      - name: Add HOL Guard and self-delete
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path("README.md")
+          text = path.read_text(encoding="utf-8")
+          entry = "- [HOL Guard](https://github.com/hashgraph-online/hol-guard) 🐍 - Local-first security toolkit with `plugin-scanner` for static scanning of MCP servers and Agent Skills for prompt injection, credential exposure, unsafe commands, and supply-chain risks."
+          if entry not in text:
+              anchor = "- [greynewell/mcpbr](https://github.com/greynewell/mcpbr) 🐍 - Benchmark runner for evaluating MCP server performance and agentic capabilities."
+              if anchor not in text:
+                  raise SystemExit("Testing Tools insertion anchor not found")
+              text = text.replace(anchor, anchor + "\n" + entry, 1)
+              path.write_text(text, encoding="utf-8")
+          Path(".github/workflows/apply-hol-guard.yml").unlink()
+          PY
+          git config user.name "kantorcodes"
+          git config user.email "6068672+kantorcodes@users.noreply.github.com"
+          git add README.md .github/workflows/apply-hol-guard.yml
+          git commit -m "Add HOL Guard security testing tool"
+          git push origin HEAD:add-hol-guard-security-testing
